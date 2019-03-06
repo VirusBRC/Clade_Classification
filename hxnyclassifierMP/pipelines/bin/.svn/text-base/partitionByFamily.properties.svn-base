@@ -1,0 +1,55 @@
+{
+'debugSwitch'        => 0,
+'executionDirectory' => "",
+'logInfix'           => "1900-01-10.2011-12-02",
+'workspaceRoot'      => "",
+'aggregateFile'      => "workspaceRoot/aggregated.dat",
+'idCol'              => 0,
+'startDate'          => '1900-01-10',
+'endDate'            => '2011-12-02',
+'aggregateFileComps' => ['startDate', 'endDate', '0', 'interproscan',],
+'familyNames'        => [
+                         'Arenaviridae',
+                         'Bunyaviridae',
+                         'Caliciviridae',
+                         'Coronaviridae',
+                         'Filoviridae',
+                         'Flaviviridae',
+                         'Hepeviridae',
+                         'Herpesviridae',
+                         'Paramyxoviridae',
+                         'Picornaviridae',
+                         'Poxviridae',
+                         'Reoviridae',
+                         'Rhabdoviridae',
+                         'Togaviridae',
+                        ],
+'maxElements'       => 500,
+'queryParamSubs'    => { 'familyNames' => 'varchar', },
+'queryParams'       => [ 'startDate', 'endDate', 'endDate', ],
+'queryResultsOrd'   => [ 'id', 'fn', ],
+'queryId'           => 'id',
+'queryFamilyName'   => 'fn',
+'query'             => "
+select nf.na_feature_id,
+       so.org_family
+from   dots.nasequenceimp       na,
+       dots.nafeatureimp        nf,
+       dots.sequence_other_info so
+where  nf.na_sequence_id =  na.na_sequence_id
+and    so.na_sequence_id =  na.na_sequence_id
+and    so.org_family     in (familyNames)
+and    to_char(na.modification_date,'YYYY-MM-DD') between ? and ?
+and    (na.obsolete_date  is null
+        or
+        to_char(na.obsolete_date,'YYYY-MM-DD') > ?)
+and    nf.name           =  'CDS'
+and    nf.string50       is not null
+",
+'serverType'   => 'OracleDB',
+'databaseName' => 'BRCSTG11',
+'userName'     => 'dots',
+'password'     => 'dots',
+'schemaOwner'  => 'dots'
+}
+# End of Object

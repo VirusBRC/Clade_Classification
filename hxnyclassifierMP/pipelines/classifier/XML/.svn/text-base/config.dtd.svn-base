@@ -1,0 +1,35 @@
+<!DOCTYPE Config [
+<!ELEMENT Config (Database,TempDir,SeqQuery,Type,BinaryFile) >
+<!ELEMENT Database (DB_HOST,DB_NAME,DB_PLATFORM,DB_USER,DB_PASSWORD) >
+<!ELEMENT DB_HOST (#PCDATA) >
+<!ELEMENT DB_PLATFORM (#PCDATA) >
+<!ELEMENT DB_NAME (#PCDATA) >
+<!ELEMENT DB_USER (#PCDATA) >
+<!ELEMENT DB_PASSWORD (#PCDATA) >
+<!ELEMENT Type (#PCDATA)>
+<!ELEMENT SeqQuery (flutype,serotype,seg) >
+<!ELEMENT flutype (#PCDATA)>
+<!ELEMENT serotype (#PCDATA)>
+<!ELEMENT seg (#PCDATA)>
+<!ELEMENT BinaryFile (pplacer,formatdb,blastall)>
+<!ELEMENT pplacer (#PCDATA)>
+<!ELEMENT formatdb (#PCDATA)>
+<!ELEMENT blastall (#PCDATA)>
+<!ELEMENT TempDir (#PCDATA) > 
+	
+<!ATTLIST DB_HOST value CDATA #REQUIRED>
+<!ATTLIST DB_PLATFORM value CDATA #REQUIRED>
+<!ATTLIST DB_NAME value CDATA #REQUIRED>
+<!ATTLIST DB_USER value CDATA #REQUIRED>
+<!ATTLIST DB_PASSWORD value CDATA #REQUIRED>
+<!ATTLIST Type value CDATA #REQUIRED>
+<!ATTLIST TempDir value CDATA #REQUIRED>
+<!ATTLIST flutype value CDATA #REQUIRED>
+<!ATTLIST serotype value CDATA #REQUIRED>
+<!ATTLIST seg value CDATA #REQUIRED>
+<!ATTLIST pplacer value CDATA #REQUIRED>
+<!ATTLIST formatdb value CDATA #REQUIRED>
+<!ATTLIST blastall value CDATA #REQUIRED>
+
+]>
+

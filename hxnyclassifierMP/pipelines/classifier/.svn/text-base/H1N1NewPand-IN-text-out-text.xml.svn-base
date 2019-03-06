@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Config>
+  <Param name="input" value="text"></Param>
+  <Param name="output" value="text"></Param>
+
+  <Param name="flutype" value="A"></Param>
+  <Param name="serotype" value="H1N1"></Param>
+  <Param name="seg" value="seg8"></Param>
+  <Param name="Type" value="H1N1NewPand"></Param>
+  <Param name="lookupfile" value="/home/idaily/influenza_daily/classifier/H1N1NewPand.cached"></Param>
+
+  <Param name="TempDir" value="/var/tmp/"></Param>
+  <Param name="ClassifierDir" value="classifier"></Param>
+
+  <Param name="formatdb" value="/home/idaily/bin/formatdb"></Param>
+  <Param name="blastall" value="/home/idaily/bin/blastall"></Param>
+  <Param name="blastdb" value="H1N1NewPand.fasta"></Param>
+  <Param name="blastdir" value="blastdb"></Param>
+
+  <Param name="DB_NAME" value="BRCSTG11"></Param>
+  <Param name="DB_HOST" value="ip-10-0-1-25.ec2.internal"></Param>
+  <Param name="DB_USER" value="dots"></Param>
+  <Param name="DB_PLATFORM" value="Oracle"></Param>
+  <Param name="DB_PASSWORD" value="dots#2"></Param>
+
+  <Param name="pplacer" value="/home/idaily/influenza_daily/classifier/pplacer-v1.1.alpha13-Linux-2.6.32/pplacer"></Param>
+
+</Config>

@@ -1,0 +1,581 @@
+#!/usr/bin/perl
+######################################################################
+#                  Copyright (c) 2012 Northrop Grumman.
+#                          All rights reserved.
+######################################################################
+
+######################################################################
+#
+# Module:  processHxNyClassifierByFastaFile.pl
+#
+# Description:  This tools processeses the HxNy classifier.
+#
+# Assumptions:
+#
+######################################################################
+
+################################################################################
+#
+#				Required Modules
+#
+################################################################################
+
+use strict;
+
+use Carp qw(cluck);
+use Cwd 'chdir';
+use File::Basename;
+use FileHandle;
+use Getopt::Std;
+use Pod::Usage;
+
+use Bio::SeqIO;
+
+use util::ConfigParams;
+use util::Constants;
+use util::ErrMgr;
+use util::PathSpecifics;
+use util::Tools;
+
+use ncbi::ErrMsgs;
+
+use parallel::Utils;
+
+###############################################################################
+#
+#				Signal Handlers
+#
+################################################################################
+
+$SIG{HUP}  = 'signalHandler';
+$SIG{INT}  = 'signalHandler';
+$SIG{TERM} = 'signalHandler';
+
+################################################################################
+#
+#				   Error and Message Management
+#
+################################################################################
+
+my $error_mgr = new util::ErrMgr(ncbi::ErrMsgs::ERROR_HEADER);
+my $tools     = new util::Tools($error_mgr);
+my $utils     = new parallel::Utils( $error_mgr, $tools );
+my $cmds      = $tools->cmds;
+
+################################################################################
+#
+#				   Constants
+#
+################################################################################
+
+sub CLASSIFIER_DIRECTORY { return 'classifier'; }
+sub CLASSIFIER_STATUS    { return '.status.classifier'; }
+sub CLASSIFIER_TOOL      { return 'HxNyClassifier.pl'; }
+sub CLUSTALW_STATUS      { return '.status.clustalw'; }
+sub FASTA_TYPE           { return 'fasta'; }
+sub NA_SEQUENCE_ID       { return '12345678'; }
+sub PPLACER_DIRECTORY    { return 'pplacer-v1.1.alpha13-Linux-2.6.32'; }
+sub RUN_FASTA            { return 'run.fasta'; }
+sub RUN_PROPERTIES       { return 'runHxNyClustalwClassifier.properties'; }
+sub RUN_TOOL             { return 'bin/runHxNyClustalwClassifier.pl'; }
+sub SEQ_OUTPUT           { return 'seq.output'; }
+sub YEAR_DATE            { return '12345678'; }
+###
+### Replacements for XML-File
+###
+sub PPLACER_DIR { return '____PPLACER_DIRECTORY____'; }
+sub TAXIT_TOOL  { return '____TAXIT_TOOL____'; }
+sub TMP_DIR     { return '____TMP_DIRECTORY____'; }
+###
+### Error Category
+###
+sub ERR_CAT { return util::ErrMsgs::PROG_CAT; }
+
+################################################################################
+#
+#			    Local Functions
+#
+################################################################################
+
+sub _getClassifierConfig {
+  my ( $sourceXmlFile, $destDirectory, $pplacerDirectory, $taxitTool ) = @_;
+  my $destXmlFile =
+    join( util::Constants::SLASH, $destDirectory, basename($sourceXmlFile) );
+  my $tmp         = TMP_DIR;
+  my $pplacer_dir = PPLACER_DIR;
+  my $taxit_tool  = TAXIT_TOOL;
+  my $ifh         = new FileHandle;
+  $ifh->open( $sourceXmlFile, '<' );
+  my $ofh = new FileHandle;
+  $ofh->open( $destXmlFile, '>' );
+
+  while ( !$ifh->eof ) {
+    my $line = $ifh->getline;
+    chomp($line);
+    $line =~ s/$tmp/$destDirectory/;
+    $line =~ s/$pplacer_dir/$pplacerDirectory/;
+    $line =~ s/$taxit_tool/$taxitTool/;
+    $ofh->print("$line\n");
+  }
+  $ifh->close;
+  $ofh->close;
+  return $destXmlFile;
+}
+
+sub _getStatus {
+  my ($statusFile) = @_;
+  my $fh = new FileHandle;
+  $fh->open( $statusFile, '<' );
+  my $line = undef;
+  while ( !$fh->eof ) {
+    $line = $fh->getline;
+    chomp($line);
+    last;
+  }
+  $fh->close;
+  if ( util::Constants::EMPTY_LINE($line) ) {
+    return util::Constants::TRUE;
+  }
+  else {
+    $line =~ s/^\s+//;
+    $line =~ s/\s+$//;
+    if ( $line eq $tools->FAILED ) {
+      return util::Constants::TRUE;
+    }
+    elsif ( $line eq $tools->SUCCEEDED ) {
+      return util::Constants::FALSE;
+    }
+    else {
+      return util::Constants::TRUE;
+    }
+  }
+}
+
+sub _getClade {
+  my ($clade_file) = @_;
+  my $fh = new FileHandle;
+  $fh->open( $clade_file, '<' );
+  my $line = undef;
+  while ( !$fh->eof ) {
+    $line = $fh->getline;
+    chomp($line);
+  }
+  $fh->close;
+  my $acc   = util::Constants::EMPTY_STR;
+  my $clade = util::Constants::EMPTY_STR;
+  my $tree  = util::Constants::EMPTY_STR;
+  if ( !util::Constants::EMPTY_LINE($line) ) {
+    ( $acc, $clade, $tree ) = split( /\t/, $line );
+  }
+  return ( $clade, $tree );
+}
+
+sub _getPostMappingFile {
+  my ($file) = @_;
+
+  my $postMapping = {};
+  return $postMapping if ( !-e $file );
+  $error_mgr->printMsg("Acquiring post mapping file:  $file");
+
+  my $fh = new FileHandle;
+  $fh->open( $file, '<' );
+  while ( !$fh->eof ) {
+    my $line = $fh->getline;
+    chomp($line);
+    next if ( util::Constants::EMPTY_LINE($line) );
+    my ( $clade, $post_clade ) = split( /\t/, $line );
+    $postMapping->{$clade} = $post_clade;
+  }
+  $fh->close;
+  return $postMapping;
+}
+
+################################################################################
+#
+#			    Parameter Initialization
+#
+################################################################################
+
+use vars qw(
+  $opt_E
+  $opt_F
+  $opt_O
+  $opt_P
+);
+getopts("E:F:O:P:");
+
+###
+### Make Sure Required Parameters Are Available
+### Otherwise, print usage message.
+###
+if ( !defined($opt_E)
+  || !defined($opt_F)
+  || !defined($opt_O)
+  || !defined($opt_P) )
+{
+  my $message = "You must supply the";
+  if ( !defined($opt_E) ) { $message .= " -E execution_directory"; }
+  if ( !defined($opt_F) ) { $message .= " -F fasta_file"; }
+  if ( !defined($opt_O) ) { $message .= " -O outputFile"; }
+  if ( !defined($opt_P) ) { $message .= " -P properties file"; }
+  pod2usage(
+    -message => $message,
+    -exitval => 2,
+    -verbose => util::Constants::TRUE,
+    -output  => \*STDERR
+  );
+}
+
+STDERR->autoflush(util::Constants::TRUE);    ### Make unbuffered
+STDOUT->autoflush(util::Constants::TRUE);    ### Make unbuffered
+select STDOUT;
+
+################################################################################
+#
+#				Parameter Setup
+#
+################################################################################
+
+my $executionDirectory = getPath($opt_E);
+my $fastaFile          = getPath($opt_F);
+my $outputFile         = getPath($opt_O);
+my $propertiesFile     = getPath($opt_P);
+
+my $properties = new util::ConfigParams($error_mgr);
+if ( -e $propertiesFile ) {
+  $properties->loadFile($propertiesFile);
+}
+else {
+  $properties->configModule($propertiesFile);
+}
+
+################################################################################
+#
+#				Classifier Specifics
+#
+################################################################################
+
+my $classifierType = $properties->getProperty('classifierType');
+$classifierType =~ /^(H[0-9])/;
+my $classifierPrefix = $1;
+
+sub HXNY_ADVANCED {
+  return join( util::Constants::DOT, lc($classifierType), 'advanced' );
+}
+
+sub CLASSIFIER_XML_FILE {
+  return join( util::Constants::EMPTY_STR,
+    'config/flu/daily/', $classifierType, '-Advanced-IN-text-out-text.xml' );
+}
+
+sub REFERENCE_POST_MAPPING_FILE {
+  return join( util::Constants::SLASH,
+    $properties->getProperty('referenceDataRoot'),
+    lc($classifierType),
+    join( util::Constants::EMPTY_STR,
+      $classifierPrefix, 'CladeClassn.post.lookup'
+    )
+  );
+}
+
+sub REFERENCE_FASTA_FILE {
+  return
+    join( util::Constants::EMPTY_STR, $classifierPrefix, 'CladeClassn.fasta' );
+}
+
+sub REFERENCE_TREE_FILE {
+  return
+    join( util::Constants::EMPTY_STR, $classifierPrefix, 'CladeClassn.tree' );
+}
+
+sub REFERENCE_LOOKUP_FILE {
+  return join( util::Constants::EMPTY_STR,
+    $classifierPrefix, 'CladeClassn.tree.lookup' );
+}
+
+sub REFERENCE_FILES {
+  return (
+    REFERENCE_FASTA_FILE,
+    join( util::Constants::EMPTY_STR,
+      $classifierPrefix, 'CladeClassn.node.lookup'
+    ),
+    join( util::Constants::EMPTY_STR, $classifierPrefix, 'CladeClassn.stats' ),
+    REFERENCE_TREE_FILE,
+    REFERENCE_LOOKUP_FILE,
+  );
+}
+
+################################################################################
+#
+#				Program Initialization
+#
+################################################################################
+###
+### Reference Post Mapping Data
+###
+my $postMapping = _getPostMappingFile(REFERENCE_POST_MAPPING_FILE);
+###
+### Create Unique Execution Directory
+###
+$executionDirectory = join( util::Constants::SLASH,
+  $executionDirectory, $cmds->TMP_FILE($classifierType) );
+$cmds->createDirectory( $executionDirectory, 'creating execution directory' );
+###
+### Create the Tool Tmp Directory
+###
+my $classifierDirectory =
+  join( util::Constants::SLASH, $executionDirectory, YEAR_DATE, HXNY_ADVANCED );
+$cmds->createDirectory( $classifierDirectory, 'creating classifier directory' );
+###
+### Get the Classifier Configuration
+###
+my $classifierXmlFile = join( util::Constants::SLASH,
+  $properties->getProperty('perlSoftwareRoot'),
+  CLASSIFIER_XML_FILE
+);
+my $pplacerDirectory = join( util::Constants::SLASH,
+  $properties->getProperty('perlSoftwareRoot'),
+  CLASSIFIER_DIRECTORY, PPLACER_DIRECTORY
+);
+my $classifierConfig =
+  _getClassifierConfig( $classifierXmlFile, $executionDirectory,
+  $pplacerDirectory, $properties->getProperty('taxitTool') );
+###
+### Link Reference Data
+###
+for my $refFile (REFERENCE_FILES) {
+  my $source = join( util::Constants::SLASH,
+    $properties->getProperty('referenceDataRoot'),
+    lc($classifierType), $refFile
+  );
+  my $msgs = { cmd => $cmds->LINK_FILE( $source, $classifierDirectory ), };
+  my $status =
+    $cmds->executeCommand( $msgs, $msgs->{cmd}, 'Linking reference file' );
+}
+###
+### Create the Properties File
+###
+my $runProperties = new util::ConfigParams($error_mgr);
+
+$runProperties->setProperty( 'classifierConfig', $classifierConfig );
+$runProperties->setProperty(
+  'classifierPerlLib',
+  join( util::Constants::SLASH,
+    $properties->getProperty('perlSoftwareRoot'),
+    CLASSIFIER_DIRECTORY
+  )
+);
+$runProperties->setProperty( 'clustalWPath',
+  $properties->getProperty('clustalWPath') );
+$runProperties->setProperty( 'debugSwitch',  '0' );
+$runProperties->setProperty( 'logInfix',     HXNY_ADVANCED );
+$runProperties->setProperty( 'naSequenceId', '12345678' );
+$runProperties->setProperty( 'profileFasta',
+  join( util::Constants::SLASH, $classifierDirectory, REFERENCE_FASTA_FILE ) );
+$runProperties->setProperty( 'yearDate', '12345678' );
+$runProperties->setProperty(
+  'classifierTool',
+  join( util::Constants::SLASH,
+    $properties->getProperty('perlSoftwareRoot'), CLASSIFIER_DIRECTORY,
+    CLASSIFIER_TOOL
+  )
+);
+###
+### Read the reference lookup file
+###
+my $referenceLookup = {};
+my $refFile         = join( util::Constants::SLASH,
+  $properties->getProperty('referenceDataRoot'),
+  lc($classifierType), REFERENCE_LOOKUP_FILE
+);
+my $rfh = $utils->openFile( $refFile, '<' );
+
+while ( !$rfh->eof ) {
+  my $line = $rfh->getline;
+  chomp($line);
+  my ( $accession, $clade ) = split( /\t/, $line );
+  $referenceLookup->{$accession} = $clade;
+}
+$rfh->close;
+
+my $refTreeData = util::Constants::EMPTY_STR;
+my $refTreeFile = join( util::Constants::SLASH,
+  $properties->getProperty('referenceDataRoot'),
+  lc($classifierType), REFERENCE_TREE_FILE
+);
+$rfh = $utils->openFile( $refTreeFile, '<' );
+while ( !$rfh->eof ) {
+  my $line = $rfh->getline;
+  chomp($line);
+  $refTreeData .= $line;
+}
+$rfh->close;
+
+################################################################################
+#
+#				Main Program
+#
+################################################################################
+
+my $fh = $utils->openFile( $fastaFile, '<' );
+my $fasta = new Bio::SeqIO( -fh => $fh, -format => FASTA_TYPE );
+my $ofh = new FileHandle;
+$ofh->open( $outputFile, '>' );
+$ofh->autoflush(util::Constants::TRUE);    ### Make unbuffered
+my $hxnyClade =
+  join( util::Constants::UNDERSCORE, lc($classifierType), 'clade' );
+$ofh->print(
+  join( util::Constants::TAB,
+    'defline', $hxnyClade, 'accession', 'unified_tree' )
+    . util::Constants::NEWLINE
+);
+
+while ( my $seq = $fasta->next_seq ) {
+  ###
+  ### Run the sequence through the classifier
+  ###
+  my $def_line = $seq->display_id;
+  $def_line =~ /^([A-Z0-9]+)/i;
+  my $acc = uc($1);
+  my $seq = $seq->seq;
+  ###
+  ### Determine if reference sequence
+  ###
+  if ( defined( $referenceLookup->{$acc} ) ) {
+    my $clade = $referenceLookup->{$acc};
+    $error_mgr->printMsg("Reference sequence clade = $clade");
+    $ofh->print(
+      join( util::Constants::TAB, $def_line, $clade, $acc, $refTreeData )
+        . util::Constants::NEWLINE );
+    next;
+  }
+  ###
+  ### Create Run Directory
+  ###
+  my $runDir = join( util::Constants::SLASH, $classifierDirectory, $acc );
+  $cmds->createDirectory( $runDir, 'creating run directory' );
+  chdir($runDir);
+  ###
+  ### Output Files
+  ###
+  my $seqOutput      = join( util::Constants::SLASH, $runDir, SEQ_OUTPUT );
+  my $clustalWStatus = join( util::Constants::SLASH, $runDir, CLUSTALW_STATUS );
+  my $classifierStatus =
+    join( util::Constants::SLASH, $runDir, CLASSIFIER_STATUS );
+  ###
+  ### Complete properties File
+  ###
+  $runProperties->setProperty( 'classifierStatus',   $classifierStatus );
+  $runProperties->setProperty( 'clustalwStatus',     $clustalWStatus );
+  $runProperties->setProperty( 'executionDirectory', $runDir );
+  $runProperties->setProperty( 'gbAccession',        $acc );
+  $runProperties->setProperty( 'seqOut',             $seqOutput );
+  $runProperties->setProperty( 'sequence',           $seq );
+  $runProperties->setProperty( 'workspaceRoot',      $runDir );
+  my $propertiesFile = join( util::Constants::SLASH, $runDir, RUN_PROPERTIES );
+  $runProperties->storeFile($propertiesFile);
+  ###
+  ### Run Configuration
+  ###
+  my $runTool = join( util::Constants::SLASH,
+    $properties->getProperty('perlSoftwareRoot'), RUN_TOOL );
+  my $cmd = join( util::Constants::SPACE, $runTool, '-P', $propertiesFile );
+  my $msgs = { cmd => $cmd };
+  my $status =
+    $cmds->executeCommand( $msgs, $msgs->{cmd},
+    'Running classifier for fasta file' );
+  $error_mgr->exitProgram( ERR_CAT, 1,
+    [ 'run classifier', 'fasta file', $fastaFile, $status ], $status );
+  my $clustalw_status = _getStatus($clustalWStatus);
+  $error_mgr->exitProgram( ERR_CAT, 1,
+    [ 'run classifier', 'fasta file', $fastaFile, 'clustalw failed' ],
+    $clustalw_status );
+  my $classifier_status = _getStatus($classifierStatus);
+  $error_mgr->exitProgram( ERR_CAT, 1,
+    [ 'run classifier', 'fasta file', $fastaFile, 'classifier failed' ],
+    $classifier_status );
+  ###
+  ### Must do post-processing of clade before writing it out
+  ###
+  my ( $clade, $tree ) = _getClade($seqOutput);
+  if ( scalar keys %{$postMapping} > 0 ) {
+    if ( defined( $postMapping->{$clade} ) ) {
+      $error_mgr->printMsg("Pre mapping clade  = $clade");
+      $clade = $postMapping->{$clade};
+      $error_mgr->printMsg("Post mapping clade = $clade");
+    }
+  }
+  $ofh->print(
+    join( util::Constants::TAB, $def_line, $clade, $acc, $tree )
+      . util::Constants::NEWLINE );
+}
+$ofh->close;
+###
+### Remove Run Directories
+###
+my $msgs = { cmd => $cmds->RM_DIR($executionDirectory), };
+my $remove_status =
+  $cmds->executeCommand( $msgs, $msgs->{cmd}, 'Removing run directories' );
+$error_mgr->exitProgram(
+  ERR_CAT, 1,
+  [
+    'run classifier',
+    'remove run directories',
+    $executionDirectory,
+    'remove failed'
+  ],
+  $remove_status
+);
+
+################################################################################
+#
+#				Epiplogue
+#
+################################################################################
+
+$tools->closeLogging;
+$tools->terminate;
+
+################################################################################
+#
+#				Signal Handler
+#
+################################################################################
+
+sub signalHandler {
+  my $signal = shift;
+  cluck $signal;
+  my $print_prefix = 'ERROR(signalHandler):  ';
+  eval {
+    print STDOUT "\n\n", $print_prefix . "SIGNAL = $signal\n",
+      $print_prefix . "NAME   = ";
+    if ( $signal eq 'HUP' ) {
+      print STDOUT "SIGHUP\n";
+    }
+    elsif ( $signal eq 'INT' ) {
+      print STDOUT "SIGINT\n";
+    }
+    elsif ( $signal eq 'TERM' ) {
+      print STDOUT "SIGTERM\n";
+    }
+    elsif ( $signal eq '__DIE__' ) {
+      print STDOUT "__DIE__\n";
+    }
+    print STDOUT $print_prefix . "End-Of-signalHandler, POSIX EXIT CODE = 2\n";
+    POSIX::_exit(2);
+  };
+}
+
+__END__
+
+=head1 NAME
+
+processHxNyClassifierByFastaFile.pl
+
+=head1 SYNOPSIS
+
+   processHxNyClassifierByFastaFile.pl -C clustalWPath -E executionDirectory -F fastaFile  -H classifierType (H5N1 or H1N1) -O outputFile -P perlSoftwareRoot -R referenceDataRoot -T taxitTool
+
+This tools processeses the HxNy classifier with fasta_file input.
+
+=cut

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Config>
+  <Param name="input" value="text"></Param>
+  <Param name="output" value="text"></Param>
+
+  <Param name="flutype" value="A"></Param>
+  <Param name="serotype" value="H1"></Param>
+  <Param name="seg" value="4"></Param>
+
+  <Param name="Type" value="HxNy"></Param>
+  <Param name="Type_tree" value="Advanced"></Param>
+  <Param name="Node_lookup" value="H1CladeClassn.node.lookup"></Param>
+
+  <Param name="TempDir" value="____TMP_DIRECTORY____"></Param>
+  <Param name="ClassifierDir" value="__DATE__/h1.advanced"></Param>
+  <Param name="ClassifierPattern" value="__DATE__"></Param>
+
+  <Param name="HAlign" value="output.profile.afa"></Param>
+  <Param name="HRefpkg" value="H1.refpkg"></Param>
+  <Param name="HStat" value="H1CladeClassn.stats"></Param>
+  <Param name="HTree" value="H1CladeClassn.tree"></Param>
+  <Param name="lookupfile" value="H1CladeClassn.tree.lookup"></Param>
+
+  <Param name="pplacer" value="____PPLACER_DIRECTORY____"></Param>
+  <Param name="taxit" value="____TAXIT_TOOL____"></Param>
+
+  <Param name="DB_HOST" value="172.16.1.144"></Param>
+  <Param name="DB_PLATFORM" value="Oracle"></Param>
+  <Param name="DB_NAME" value="BRCSTG11"></Param>
+  <Param name="DB_PASSWORD" value="dots"></Param>
+  <Param name="DB_USER" value="dots"></Param>
+
+  <Param name="Lower_Threshold" value="83"></Param>
+  <Param name="Upper_Threshold" value="85"></Param>
+  <Param name="blastall" value="/home/idaily/bin/blastall"></Param>
+  <Param name="blastdb" value="H1CladeClassn.fasta"></Param>
+  <Param name="blastdir" value="blastdb"></Param>
+  <Param name="formatdb" value="/home/idaily/bin/formatdb"></Param>
+</Config>

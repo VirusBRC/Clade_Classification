@@ -1,0 +1,52 @@
+10
+
+dir
+40257
+svn://brc-shared-file/DEV/dbadmin/pipelines/lib
+svn://brc-shared-file
+
+
+
+2013-10-30T16:09:33.003895Z
+40146
+tsmith
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+1541ce5a-508d-d340-a9c9-6d87185756a1
+
+asn
+dir
+
+db
+dir
+
+file
+dir
+
+ncbi
+dir
+
+parallel
+dir
+
+tool
+dir
+
+util
+dir
+
+xml
+dir
+

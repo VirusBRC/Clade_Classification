@@ -1,0 +1,3 @@
+scp -r dbadmin@172.16.1.100:/home/public/app/brcDocs/datafiles/classifier/h1n1/new/H1Clade* .
+or
+scp -r dbadmin@192.168.1.15:/home/public/app/brcDocs/datafiles/classifier/h1n1/new/H1Clade* .
