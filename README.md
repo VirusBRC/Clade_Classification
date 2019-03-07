@@ -9,4 +9,6 @@ The swine H1 clade classification tool classifies the clade of the HA/H1 viruses
 
 The highly pathogenic H5N1 clade classification contains the code to enable the algorithm for classifying the clade of the hemagglutinin gene of influenza A(H5) viruses. It uses phylogenetic analysis to classify HA (H5) sequences (from both highly pathogenic Goose/Guangdong-like viruses and from non-pathogenic Eurasian and American lineage viruses) according to the WHO classification scheme. It has been verified as highly accurate (> 98%) for sequences of at least 300 nucleotides of HA1. Refer to the 'IRD_H5_CLADE_SOP.pdf' for more details.
 
+The procedure was developed as a collaboration by Virus-BRC Co-investigator Catherine Macken (U of Auckland), Tavis Anderson and other swine influenza experts at the US Department of Agriculture. 
+
 
