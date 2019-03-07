@@ -3,6 +3,7 @@ Clade Classification
 The United States Government Department of Health and Human Services, National Institutes of Health (NIH), National Institute of Allergy and Infectious Diseases, owns the copyright to the accompanying software under FAR 52.227-14 (c). 
 
 The swine H1 clade classification tool classifies the clade of the HA/H1 viruses from any host and for any NA subtype, with reference to the global swine H1 clade scheme and the US swine H1 classification scheme. This tool infers the clade for a query sequence from its position within the reference tree. 
+
 Refer to SOP_SwineH1CladeClassn_062415.pdf for more details on US Swine H1 Clade Classification.
 Refer to the SOP_Global_Swine_H1_Clade.pdf for more details Global Swine H1 Clade Classification.
 
